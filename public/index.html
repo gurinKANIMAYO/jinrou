@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人狼ゲーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .timer {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ffeb3b;
+        }
+
+        .phase {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .day-count {
+            font-size: 1.2em;
+        }
+
+        .login-form {
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .login-form input {
+            padding: 10px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            margin: 10px;
+            width: 200px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #e68900;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .players-section, .actions-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .player-list {
+            margin-top: 15px;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+
+        .player-item.dead {
+            opacity: 0.5;
+            text-decoration: line-through;
+        }
+
+        .player-item.werewolf {
+            border-left: 4px solid #f44336;
+        }
+
+        .role-info {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .role-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .role-description {
+            font-size: 1em;
+            opacity: 0.9;
+        }
+
+        .night-actions {
+            margin-top: 20px;
+        }
+
+        .action-form {
+            margin-bottom: 15px;
+        }
+
+        .action-form select {
+            padding: 8px;
+            font-size: 1em;
+            border: none;
+            border-radius: 5px;
+            margin-right: 10px;
+            width: 150px;
+        }
+
+        .voting-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .vote-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .vote-btn {
+            padding: 8px 15px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .vote-btn:hover {
+            background: #1976d2;
+        }
+
+        .vote-btn.selected {
+            background: #ff9800;
+        }
+
+        .chat-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .chat-message {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .chat-message.werewolf {
+            background: rgba(244,67,54,0.3);
+            border-left: 3px solid #f44336;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .results-section {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            padding: 10px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .game-over {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .winner {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .winner.villager {
+            color: #4caf50;
+        }
+
+        .winner.werewolf {
+            color: #f44336;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .game-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐺 人狼ゲーム 🌙</h1>
+        </div>
+
+        <!-- ログイン画面 -->
+        <div id="loginScreen" class="login-form">
+            <h2>ゲームに参加</h2>
+            <input type="text" id="playerName" placeholder="あなたの名前を入力" maxlength="20">
+            <br>
+            <button class="btn btn-primary" onclick="joinGame()">参加</button>
+        </div>
+
+        <!-- ゲーム画面 -->
+        <div id="gameScreen" class="hidden">
+            <!-- ゲーム情報 -->
+            <div class="game-info">
+                <div class="phase" id="gamePhase">待機中...</div>
+                <div class="day-count" id="dayCount">準備中</div>
+                <div class="timer" id="timer">--:--</div>
+            </div>
+
+            <!-- 役職情報 -->
+            <div id="roleInfo" class="role-info hidden">
+                <div class="role-name" id="roleName"></div>
+                <div class="role-description" id="roleDescription"></div>
+                <div id="werewolfInfo" class="hidden">
+                    <strong>仲間の人狼:</strong> <span id="werewolfList"></span>
+                </div>
+            </div>
+
+            <!-- ゲーム終了 -->
+            <div id="gameOver" class="game-over hidden">
+                <div class="winner" id="winnerText"></div>
+                <button class="btn btn-primary" onclick="location.reload()">新しいゲームを始める</button>
+            </div>
+
+            <!-- メインコンテンツ -->
+            <div class="main-content">
+                <!-- プレイヤー一覧 -->
+                <div class="players-section">
+                    <h3>プレイヤー一覧</h3>
+                    <div class="player-list" id="playerList"></div>
+                    <button id="startGameBtn" class="btn btn-primary hidden" onclick="startGame()">ゲーム開始</button>
+                </div>
+
+                <!-- アクション -->
+                <div class="actions-section">
+                    <h3>アクション</h3>
+                    
+                    <!-- 夜の行動 -->
+                    <div id="nightActions" class="night-actions hidden">
+                        <h4>夜の行動</h4>
+                        
+                        <!-- 人狼の襲撃 -->
+                        <div id="werewolfAction" class="action-form hidden">
+                            <label>襲撃対象を選択:</label>
+                            <select id="attackTarget">
+                                <option value="">選択してください</option>
+                            </select>
+                            <button class="btn btn-danger" onclick="setAttackTarget()">襲撃</button>
+                        </div>
+
+                        <!-- 占い師の占い -->
+                        <div id="seerAction" class="action-form hidden">
+                            <label>占い対象を選択:</label>
+                            <select id="divineTarget">
+                                <option value="">選択してください</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="setDivineTarget()">占い</button>
+                        </div>
+
+                        <!-- 狩人の護衛 -->
+                        <div id="knightAction" class="action-form hidden">
+                            <label>護衛対象を選択:</label>
+                            <select id="defendTarget">
+                                <option value="">選択してください</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="setDefendTarget()">護衛</button>
+                        </div>
+                    </div>
+
+                    <!-- 投票 -->
+                    <div id="votingSection" class="voting-section hidden">
+                        <h4>投票</h4>
+                        <p>処刑したい人を選んでください:</p>
+                        <div class="vote-buttons" id="voteButtons"></div>
+                    </div>
+
+                    <!-- 結果表示 -->
+                    <div id="resultsSection" class="results-section hidden">
+                        <h4>結果</h4>
+                        <div id="resultsList"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- チャット -->
+            <div class="chat-section">
+                <h3>チャット</h3>
+                <div class="chat-messages" id="chatMessages"></div>
+                <div class="chat-input">
+                    <input type="text" id="chatInput" placeholder="メッセージを入力..." maxlength="200">
+                    <button class="btn btn-primary" onclick="sendMessage()">送信</button>
+                    <button id="werewolfChatBtn" class="btn btn-danger hidden" onclick="toggleWerewolfChat()">人狼チャット</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // ゲーム状態
+        let socket;
+        let gameState = {};
+        let currentPlayer = {};
+        let isWerewolfChatMode = false;
+
+        // 初期化
+        function init() {
+            socket = io();
+            setupSocketListeners();
+        }
+
+        // Socket.IOイベントリスナー設定
+        function setupSocketListeners() {
+            socket.on('joined', (data) => {
+                currentPlayer = data;
+                showGameScreen();
+                updateGameState(data.gameState);
+            });
+
+            socket.on('join-failed', (data) => {
+                alert('参加に失敗しました: ' + data.reason);
+            });
+
+            socket.on('player-joined', (data) => {
+                updateGameState(data.gameState);
+                addChatMessage('システム', `${data.name}が参加しました`);
+            });
+
+            socket.on('player-left', (data) => {
+                updateGameState(data.gameState);
+                addChatMessage('システム', 'プレイヤーが退出しました');
+            });
+
+            socket.on('role-assigned', (data) => {
+                currentPlayer.role = data.role;
+                showRoleInfo(data.roleInfo);
+                
+                if (data.werewolfInfo && data.werewolfInfo.length > 0) {
+                    showWerewolfInfo(data.werewolfInfo);
+                }
+            });
+
+            socket.on('game-started', (data) => {
+                updateGameState(data);
+                addChatMessage('システム', 'ゲームが開始されました！');
+            });
+
+            socket.on('timer-update', (data) => {
+                updateTimer(data.timeRemaining);
+            });
+
+            socket.on('phase-changed', (data) => {
+                updateGameState(data);
+                handlePhaseChange(data.gameState);
+            });
+
+            socket.on('vote-update', (data) => {
+                updateGameState(data);
+            });
+
+            socket.on('chat-message', (data) => {
+                addChatMessage(data.name, data.message);
+            });
+
+            socket.on('werewolf-chat', (data) => {
+                addChatMessage(data.name, data.message, true);
+            });
+
+            socket.on('seer-result', (data) => {
+                addResult(`占い結果: ${data.target}は${data.result}です`);
+            });
+
+            socket.on('medium-result', (data) => {
+                addResult(`霊能結果: ${data.target}は${data.result}でした`);
+            });
+
+            socket.on('action-accepted', () => {
+                addChatMessage('システム', '行動を受け付けました');
+            });
+
+            socket.on('vote-accepted', () => {
+                addChatMessage('システム', '投票を受け付けました');
+            });
+        }
+
+        // ゲームに参加
+        function joinGame() {
+            const name = document.getElementById('playerName').value.trim();
+            if (!name) {
+                alert('名前を入力してください');
+                return;
+            }
+            
+            socket.emit('join-game', { name });
+        }
+
+        // ゲーム画面を表示
+        function showGameScreen() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+        }
+
+        // ゲーム開始
+        function startGame() {
+            socket.emit('start-game');
+        }
+
+        // ゲーム状態更新
+        function updateGameState(state) {
+            gameState = state;
+            updatePhaseDisplay();
+            updatePlayerList();
+            updateActionButtons();
+            updateVotingSection();
+            
+            if (state.gameState === 'ended') {
+                showGameOver(state.winner);
+            }
+        }
+
+        // フェーズ表示更新
+        function updatePhaseDisplay() {
+            const phaseElement = document.getElementById('gamePhase');
+            const dayElement = document.getElementById('dayCount');
+            
+            let phaseText = '';
+            switch (gameState.gameState) {
+                case 'waiting':
+                    phaseText = '待機中';
+                    break;
+                case 'night':
+                    phaseText = '夜フェーズ';
+                    break;
+                case 'day':
+                    phaseText = '昼フェーズ';
+                    break;
+                case 'voting':
+                    phaseText = '投票フェーズ';
+                    break;
+                case 'ended':
+                    phaseText = 'ゲーム終了';
+                    break;
+            }
+            
+            phaseElement.textContent = phaseText;
+            dayElement.textContent = gameState.dayCount ? `${gameState.dayCount}日目` : '準備中';
+        }
+
+        // プレイヤー一覧更新
+        function updatePlayerList() {
+            const playerListElement = document.getElementById('playerList');
+            const startGameBtn = document.getElementById('startGameBtn');
+            
+            playerListElement.innerHTML = '';
+            
+            gameState.players.forEach(player => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-item';
+                
+                if (!player.isAlive) {
+                    playerDiv.classList.add('dead');
+                }
+                
+                // 人狼の場合は仲間に表示
+                if (currentPlayer.role === 'werewolf' && player.role === 'werewolf' && player.id !== currentPlayer.playerId) {
+                    playerDiv.classList.add('werewolf');
+                }
+                
+                let statusText = player.isAlive ? '生存' : '死亡';
+                if (!player.isAlive && player.deathReason) {
+                    statusText += ` (${player.deathReason})`;
+                }
+                
+                playerDiv.innerHTML = `
+                    <span>${player.name}</span>
+                    <span>${statusText}</span>
+                `;
+                
+                playerListElement.appendChild(playerDiv);
+            });
+            
+            // ゲーム開始ボタンの表示制御
+            if (gameState.gameState === 'waiting' && gameState.players.length >= 4) {
+                startGameBtn.classList.remove('hidden');
+            } else {
+                startGameBtn.classList.add('hidden');
+            }
+        }
+
+        // アクションボタン更新
+        function updateActionButtons() {
+            const nightActions = document.getElementById('nightActions');
+            const werewolfAction = document.getElementById('werewolfAction');
+            const seerAction = document.getElementById('seerAction');
+            const knightAction = document.getElementById('knightAction');
+            
+            // 全て非表示
+            nightActions.classList.add('hidden');
+            werewolfAction.classList.add('hidden');
+            seerAction.classList.add('hidden');
+            knightAction.classList.add('hidden');
+            
+            if (gameState.gameState === 'night') {
+                nightActions.classList.remove('hidden');
+                
+                // 役職に応じてアクション表示
+                if (currentPlayer.role === 'werewolf') {
+                    werewolfAction.classList.remove('hidden');
+                    updateTargetOptions('attackTarget', ['werewolf']);
+                } else if (currentPlayer.role === 'seer') {
+                    seerAction.classList.remove('hidden');
+                    updateTargetOptions('divineTarget', []);
+                } else if (currentPlayer.role === 'knight') {
+                    knightAction.classList.remove('hidden');
+                    updateTargetOptions('defendTarget', []);
+                }
+            }
+        }
+
+        // 対象選択肢更新
+        function updateTargetOptions(selectId, excludeRoles) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '<option value="">選択してください</option>';
+            
+            gameState.players.forEach(player => {
+                if (player.isAlive && player.id !== currentPlayer.playerId && !excludeRoles.includes(player.role)) {
+                    const option = document.createElement('option');
+                    option.value = player.id;
+                    option.textContent = player.name;
+                    select.appendChild(option);
+                }
+            });
+        }
+
+        // 投票セクション更新
+        function updateVotingSection() {
+            const votingSection = document.getElementById('votingSection');
+            const voteButtons = document.getElementById('voteButtons');
+            
+            if (gameState.gameState === 'voting') {
+                votingSection.classList.remove('hidden');
+                voteButtons.innerHTML = '';
+                
+                gameState.players.forEach(player => {
+                    if (player.isAlive && player.id !== currentPlayer.playerId) {
+                        const button = document.createElement('button');
+                        button.className = 'vote-btn';
+                        button.textContent = player.name;
+                        button.onclick = () => vote(player.id);
+                        voteButtons.appendChild(button);
+                    }
+                });
+            } else {
+                votingSection.classList.add('hidden');
+            }
+        }
+
+        // 役職情報表示
+        function showRoleInfo(roleInfo) {
+            const roleInfoDiv = document.getElementById('roleInfo');
+            const roleName = document.getElementById('roleName');
+            const roleDescription = document.getElementById('roleDescription');
+            const werewolfChatBtn = document.getElementById('werewolfChatBtn');
+            
+            roleName.textContent = roleInfo.name;
+            roleDescription.textContent = roleInfo.description;
+            roleInfoDiv.classList.remove('hidden');
+            
+            if (roleInfo.name === '人狼') {
+                werewolfChatBtn.classList.remove('hidden');
+            }
+        }
+
+        // 人狼情報表示
+        function showWerewolfInfo(werewolfInfo) {
+            const werewolfInfoDiv = document.getElementById('werewolfInfo');
+            const werewolfList = document.getElementById('werewolfList');
+            
+            werewolfList.textContent = werewolfInfo.map(w => w.name).join(', ');
+            werewolfInfoDiv.classList.remove('hidden');
+        }
+
+        // フェーズ変更処理
+        function handlePhaseChange(phase) {
+            switch (phase) {
+                case 'night':
+                    addChatMessage('システム', '夜になりました。各役職は行動を選択してください。');
+                    break;
+                case 'day':
+                    addChatMessage('システム', '朝になりました。討議の時間です。');
+                    break;
+                case 'voting':
+                    addChatMessage('システム', '投票の時間です。処刑する人を選んでください。');
+                    break;
+            }
+        }
+
+        // 夜の行動設定
+        function setAttackTarget() {
+            const target = document.getElementById('attackTarget').value;
+            if (target) {
+                socket.emit('night-action', { type: 'attack', target });
+            }
+        }
+
+        function setDivineTarget() {
+            const target = document.getElementById('divineTarget').value;
+            if (target) {
+                socket.emit('night-action', { type: 'divine', target });
+            }
+        }
+
+        function setDefendTarget() {
+            const target = document.getElementById('defendTarget').value;
+            if (target) {
+                socket.emit('night-action', { type: 'defend', target });
+            }
+        }
+
+        // 投票
+        function vote(targetId) {
+            // 前の選択を解除
+            document.querySelectorAll('.vote-btn').forEach(btn => {
+                btn.classList.remove('selected');
+            });
+            
+            // 新しい選択をハイライト
+            event.target.classList.add('selected');
+            
+            socket.emit('vote', { targetId });
+        }
+
+        // チャット送信
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                if (isWerewolfChatMode) {
+                    socket.emit('werewolf-chat', { message });
+                } else {
+                    socket.emit('chat-message', { message });
+                }
+                input.value = '';
+            }
+        }
+
+        // 人狼チャット切り替え
+        function toggleWerewolfChat() {
+            isWerewolfChatMode = !isWerewolfChatMode;
+            const btn = document.getElementById('werewolfChatBtn');
+            const input = document.getElementById('chatInput');
+            
+            if (isWerewolfChatMode) {
+                btn.textContent = '全体チャット';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-warning');
+                input.placeholder = '人狼チャット...';
+            } else {
+                btn.textContent = '人狼チャット';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-danger');
+                input.placeholder = 'メッセージを入力...';
+            }
+        }
+
+        // チャットメッセージ追加
+        function addChatMessage(name, message, isWerewolf = false) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'chat-message';
+            
+            if (isWerewolf) {
+                messageDiv.classList.add('werewolf');
+            }
+            
+            messageDiv.innerHTML = `<strong>${name}:</strong> ${message}`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 結果追加
+        function addResult(text) {
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsList = document.getElementById('resultsList');
+            
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result-item';
+            resultDiv.textContent = text;
+            
+            resultsList.appendChild(resultDiv);
+            resultsSection.classList.remove('hidden');
+        }
+
+        // タイマー更新
+        function updateTimer(seconds) {
+            const timerElement = document.getElementById('timer');
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            timerElement.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // ゲーム終了表示
+        function showGameOver(winner) {
+            const gameOverDiv = document.getElementById('gameOver');
+            const winnerText = document.getElementById('winnerText');
+            
+            winnerText.className = `winner ${winner}`;
+            winnerText.textContent = winner === 'villager' ? '村人陣営の勝利！' : '人狼陣営の勝利！';
+            
+            gameOverDiv.classList.remove('hidden');
+        }
+
+        // Enterキーでチャット送信
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('chatInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            document.getElementById('playerName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    joinGame();
+                }
+            });
+        });
+
+        // 初期化実行
+        init();
+    </script>
+</body>
+</html>
