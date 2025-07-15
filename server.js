@@ -56,6 +56,24 @@ class WerewolfGame {
         this.players.delete(playerId);
         this.votes.delete(playerId);
         this.nightActions.delete(playerId);
+        
+        // ゲーム中にプレイヤーが退出した場合、ゲーム終了判定を行う
+        if (this.gameState !== 'waiting' && this.gameState !== 'ended') {
+            if (this.checkGameEnd()) {
+                this.gameState = 'ended';
+                this.clearTimer();
+                return true; // ゲーム終了
+            }
+        }
+        return false;
+    }
+
+    // タイマーのクリア
+    clearTimer() {
+        if (this.gameTimer) {
+            clearInterval(this.gameTimer);
+            this.gameTimer = null;
+        }
     }
 
     // 役職の配布
@@ -93,7 +111,9 @@ class WerewolfGame {
         // 役職を配布
         playerIds.forEach((playerId, index) => {
             const player = this.players.get(playerId);
-            player.role = roles[index];
+            if (player) {
+                player.role = roles[index];
+            }
         });
     }
 
@@ -110,7 +130,9 @@ class WerewolfGame {
 
     // フェーズタイマー開始
     startPhaseTimer() {
+        this.clearTimer(); // 既存のタイマーをクリア
         this.timeRemaining = this.phaseTimeLimit;
+        
         this.gameTimer = setInterval(() => {
             this.timeRemaining--;
             io.emit('timer-update', { timeRemaining: this.timeRemaining });
@@ -123,17 +145,25 @@ class WerewolfGame {
 
     // 次のフェーズへ
     nextPhase() {
-        clearInterval(this.gameTimer);
+        this.clearTimer();
         
         if (this.gameState === 'night') {
             this.processNightActions();
+            // 夜の行動処理後にゲーム終了判定
+            if (this.checkGameEnd()) {
+                this.gameState = 'ended';
+                io.emit('phase-changed', this.getGameState());
+                return;
+            }
             this.gameState = 'day';
         } else if (this.gameState === 'day') {
             this.gameState = 'voting';
         } else if (this.gameState === 'voting') {
             this.processVotes();
+            // 投票処理後にゲーム終了判定
             if (this.checkGameEnd()) {
                 this.gameState = 'ended';
+                io.emit('phase-changed', this.getGameState());
                 return;
             }
             this.gameState = 'night';
@@ -143,6 +173,7 @@ class WerewolfGame {
         
         this.votes.clear();
         this.startPhaseTimer();
+        io.emit('phase-changed', this.getGameState());
     }
 
     // 夜の行動処理
@@ -257,14 +288,23 @@ class WerewolfGame {
     // ゲーム終了判定
     checkGameEnd() {
         const alivePlayers = Array.from(this.players.values()).filter(p => p.isAlive);
+        
+        // プレイヤーが1人以下の場合
+        if (alivePlayers.length <= 1) {
+            this.winner = 'draw'; // 引き分け
+            return true;
+        }
+        
         const aliveWerewolves = alivePlayers.filter(p => p.role === 'werewolf');
         const aliveVillagers = alivePlayers.filter(p => p.role !== 'werewolf');
         
+        // 人狼が全滅した場合
         if (aliveWerewolves.length === 0) {
             this.winner = 'villager';
             return true;
         }
         
+        // 人狼が村人以上の人数になった場合
         if (aliveWerewolves.length >= aliveVillagers.length) {
             this.winner = 'werewolf';
             return true;
@@ -278,6 +318,12 @@ class WerewolfGame {
         const player = this.players.get(playerId);
         if (!player || !player.isAlive || this.gameState !== 'night') return false;
         
+        // 役職に応じた行動制限
+        if (player.role === 'werewolf' && action.type !== 'attack') return false;
+        if (player.role === 'seer' && action.type !== 'divine') return false;
+        if (player.role === 'knight' && action.type !== 'defend') return false;
+        if (player.role === 'villager' || player.role === 'medium') return false;
+        
         this.nightActions.set(playerId, { playerId, ...action });
         return true;
     }
@@ -285,7 +331,11 @@ class WerewolfGame {
     // 投票
     setVote(playerId, targetId) {
         const player = this.players.get(playerId);
+        const target = this.players.get(targetId);
+        
         if (!player || !player.isAlive || this.gameState !== 'voting') return false;
+        if (!target || !target.isAlive) return false;
+        if (playerId === targetId) return false; // 自分には投票できない
         
         this.votes.set(playerId, targetId);
         return true;
@@ -319,6 +369,20 @@ class WerewolfGame {
         return Array.from(this.players.values())
             .filter(p => p.role === 'werewolf' && p.id !== playerId)
             .map(p => ({ id: p.id, name: p.name }));
+    }
+
+    // ゲームリセット
+    resetGame() {
+        this.clearTimer();
+        this.players.clear();
+        this.gameState = 'waiting';
+        this.dayCount = 1;
+        this.votes.clear();
+        this.nightActions.clear();
+        this.timeRemaining = 0;
+        this.lastExecuted = null;
+        this.nightResult = null;
+        this.winner = null;
     }
 }
 
@@ -395,7 +459,7 @@ io.on('connection', (socket) => {
     socket.on('chat-message', (data) => {
         const { message } = data;
         const player = game.players.get(socket.id);
-        if (player && player.isAlive) {
+        if (player && player.isAlive && game.gameState !== 'ended') {
             io.emit('chat-message', {
                 playerId: socket.id,
                 name: player.name,
@@ -409,7 +473,7 @@ io.on('connection', (socket) => {
     socket.on('werewolf-chat', (data) => {
         const { message } = data;
         const player = game.players.get(socket.id);
-        if (player && player.role === 'werewolf' && player.isAlive) {
+        if (player && player.role === 'werewolf' && player.isAlive && game.gameState !== 'ended') {
             // 人狼のみに送信
             for (const [playerId, p] of game.players) {
                 if (p.role === 'werewolf' && p.isAlive) {
@@ -427,43 +491,50 @@ io.on('connection', (socket) => {
         }
     });
     
-    // フェーズ移行
+    // フェーズ移行（手動）
     socket.on('next-phase', () => {
-        game.nextPhase();
-        io.emit('phase-changed', game.getGameState());
-        
-        // 霊能者に結果を通知
-        if (game.gameState === 'night' && game.lastExecuted) {
-            const medium = Array.from(game.players.values()).find(p => p.role === 'medium' && p.isAlive);
-            if (medium) {
-                const mediumSocket = io.sockets.sockets.get(medium.id);
-                if (mediumSocket) {
-                    mediumSocket.emit('medium-result', {
-                        target: game.lastExecuted.name,
-                        result: game.lastExecuted.role === 'werewolf' ? '人狼' : '人狼ではない'
-                    });
+        if (game.gameState !== 'ended') {
+            game.nextPhase();
+            
+            // 霊能者に結果を通知
+            if (game.gameState === 'night' && game.lastExecuted) {
+                const medium = Array.from(game.players.values()).find(p => p.role === 'medium' && p.isAlive);
+                if (medium) {
+                    const mediumSocket = io.sockets.sockets.get(medium.id);
+                    if (mediumSocket) {
+                        mediumSocket.emit('medium-result', {
+                            target: game.lastExecuted.name,
+                            result: game.lastExecuted.role === 'werewolf' ? '人狼' : '人狼ではない'
+                        });
+                    }
                 }
             }
-        }
-        
-        // 占い師に結果を通知
-        if (game.gameState === 'day' && game.nightResult) {
-            const seerSocket = io.sockets.sockets.get(game.nightResult.playerId);
-            if (seerSocket) {
-                seerSocket.emit('seer-result', game.nightResult);
+            
+            // 占い師に結果を通知
+            if (game.gameState === 'day' && game.nightResult) {
+                const seerSocket = io.sockets.sockets.get(game.nightResult.playerId);
+                if (seerSocket) {
+                    seerSocket.emit('seer-result', game.nightResult);
+                }
+                game.nightResult = null;
             }
-            game.nightResult = null;
         }
     });
     
     // 切断処理
     socket.on('disconnect', () => {
         console.log('プレイヤーが切断しました:', socket.id);
-        game.removePlayer(socket.id);
+        const gameEnded = game.removePlayer(socket.id);
+        
         io.emit('player-left', {
             playerId: socket.id,
             gameState: game.getGameState()
         });
+        
+        // プレイヤー退出でゲームが終了した場合
+        if (gameEnded) {
+            io.emit('phase-changed', game.getGameState());
+        }
     });
 });
 
